@@ -1,0 +1,12 @@
+{
+  "name": "domain-skill",
+  "owner": { "name": "Chad Fennell" },
+  "metadata": { "description": "The domain skill: shared language, decisions and requirements in Notion." },
+  "plugins": [
+    {
+      "name": "domain",
+      "source": "./",
+      "description": "Keeps a team's glossary, decision log, open questions and requirements in linked Notion databases, and gives each session an index of them."
+    }
+  ]
+}

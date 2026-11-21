@@ -1,0 +1,20 @@
+{
+  "description": "Puts an index of the team's Notion Glossary, Decisions, Open questions and Requirements into each Claude Code session, and adds what changed in Notion before each prompt.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/domain-index.mjs\" full", "timeout": 10 }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/domain-index.mjs\" delta", "timeout": 10 }
+        ]
+      }
+    ]
+  }
+}

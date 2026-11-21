@@ -1,0 +1,7 @@
+{
+  "ticket": "Charge the customer's card when the warehouse marks the parcel as sent, not at checkout.",
+  "branch": "feature/capture-on-dispatch",
+  "paths": ["src/payments/capture.ts"],
+  "decisions": ["ADR-3", "ADR-4", "ADR-9"],
+  "note": "Payments listens for events (ADR-3), captures on Order Shipped (ADR-4) and stores amounts in minor units (ADR-9, spans contexts)."
+}

@@ -1,0 +1,12 @@
+{
+  "name": "domain-skill",
+  "private": true,
+  "description": "The domain skill and its session index hooks. No dependencies: Node's standard library only.",
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "test": "node --test test/index.test.mjs",
+    "mock": "node test/mock-notion.mjs",
+    "recall": "node evals/recall/score.mjs"
+  }
+}

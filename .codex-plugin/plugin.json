@@ -1,0 +1,20 @@
+{
+  "name": "domain",
+  "version": "0.1.0",
+  "description": "Keeps a team's glossary, decision log, open questions and requirements in linked Notion databases, sets them up, and gives each session an index of them.",
+  "author": { "name": "Chad Fennell" },
+  "keywords": ["glossary", "ubiquitous-language", "adr", "decisions", "requirements", "notion", "domain-driven-design"],
+  "skills": "./skills/",
+  "hooks": "./hooks/codex-hooks.json",
+  "interface": {
+    "displayName": "Domain",
+    "shortDescription": "Glossary, decisions and requirements in Notion",
+    "longDescription": "Sets up and maintains a Glossary, Decisions log, Open questions and Requirements in Notion, teaches agents to read them before naming or building anything, and injects an index of them into each session.",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"],
+    "defaultPrompt": [
+      "Use the domain skill to set up our glossary, decisions and requirements in Notion.",
+      "Check the glossary before naming the new event."
+    ]
+  }
+}

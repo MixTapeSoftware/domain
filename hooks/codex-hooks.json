@@ -1,0 +1,31 @@
+{
+  "description": "Puts an index of the team's Notion Glossary, Decisions, Open questions and Requirements into each Codex session, and adds what changed in Notion before each prompt.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/scripts/domain-index.mjs\" full",
+            "timeout": 10,
+            "statusMessage": "Loading the domain index",
+            "additionalContextLimit": 3500
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/scripts/domain-index.mjs\" delta",
+            "timeout": 10,
+            "additionalContextLimit": 3500
+          }
+        ]
+      }
+    ]
+  }
+}
