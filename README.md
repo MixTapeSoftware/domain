@@ -81,7 +81,7 @@ The hooks run `scripts/domain-index.mjs`:
 | SessionStart (`startup`, `resume`, `clear`, `compact`) | `hooks/hooks.json` | `hooks/codex-hooks.json` | `full` |
 | UserPromptSubmit | `hooks/hooks.json` | `hooks/codex-hooks.json` | `delta` |
 
-The index points to pages; it never replaces them. An agent fetches the full page by ID before acting on a decision or requirement.
+The index points to pages; it never replaces them. An agent fetches the full page by ID before acting on a decision or requirement. Text from Notion rows is kept on one line, so a row can't start a heading of its own, and the index says that this text is data, not instructions.
 
 - **Tier 1, always loaded.** Each database's column names, plus the options of Bounded context and Status, read live from Notion so a renamed column can't go stale. Every Agreed and Proposed glossary term, with a one-line definition; Deprecated terms appear as "old → use new". Every open question, grouped by bounded context. A count of decisions and requirements per bounded context, and links to the Context map and Data models.
 - **Tier 2, by bounded context.** One line per live decision and requirement (ID, title, Status, Built, page ID) for the bounded contexts you're working in. Decisions tagged "Spans contexts" are always included. The script works out the bounded contexts from the paths changed on your branch, matched against the globs in `.domain/config.json`, and then from the branch name (`feature/payments-refunds` → Payments). If it can't work any out, it lists every title when they fit the budget, and otherwise how to ask for one.
