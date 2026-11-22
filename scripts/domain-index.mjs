@@ -42,6 +42,7 @@ export const LABELS = {
 };
 export const SPANS = 'Spans contexts';
 const OUTSIDE = 'Outside the system';
+const NO_CONTEXT = 'No bounded context';
 const RETIRED = new Set(['Superseded', 'Deprecated', 'Dropped']);
 const COLUMN = {
   bc: 'Bounded context',
@@ -558,13 +559,16 @@ export function render(state, level, notice) {
   const sections = [];
   const entries = [];
   const add = (name, lines) => sections.push({ name, text: lines.join('\n') });
-  const list = (label, items) => {
+  // A group line of its own would otherwise start with a Bounded context option, which
+  // anyone editing a row can create, so it starts with fixed text.
+  const byContext = (g) => (g === NO_CONTEXT ? `${g}:` : `Bounded context ${g}:`);
+  const list = (label, items, groupLine = (g) => `${g}:`) => {
     const lines = [];
     let group;
     for (const it of items) {
       if (it.group !== undefined && it.group !== group) {
         group = it.group;
-        lines.push(`${group}:`);
+        lines.push(groupLine(group));
       }
       lines.push(`- ${it.text}`);
       entries.push({ key: it.key, label: it.group ? `${label} · ${it.group}` : label, text: it.text });
@@ -619,12 +623,12 @@ export function render(state, level, notice) {
         const def = shorten(r.def, level.def);
         text = `${r.title}${marks.length ? ` (${marks.join(', ')})` : ''}${def ? `: ${def}` : ''}`;
       }
-      return { key: `g:${r.id}`, group: r.bcs[0] || 'No bounded context', text, deprecated: r.status === 'Deprecated', sortTitle: r.title };
+      return { key: `g:${r.id}`, group: r.bcs[0] || NO_CONTEXT, text, deprecated: r.status === 'Deprecated', sortTitle: r.title };
     })
     .sort((a, b) => gOrder(a.group, b.group) || a.deprecated - b.deprecated || a.sortTitle.localeCompare(b.sortTitle));
   add('glossary', [
     '## Glossary: Agreed and Proposed terms, by bounded context (use them exactly; Deprecated shown as old → new)',
-    ...(gItems.length ? list('Glossary', gItems) : ['No terms yet.']),
+    ...(gItems.length ? list('Glossary', gItems, byContext) : ['No terms yet.']),
   ]);
 
   // Tier 1: open questions
@@ -634,11 +638,11 @@ export function render(state, level, notice) {
     .sort(byUid)
     .map((r) => ({
       key: `q:${r.id}`,
-      group: r.bcs[0] || 'No bounded context',
+      group: r.bcs[0] || NO_CONTEXT,
       text: `${r.uid || '(no ID)'} ${r.title}${r.bcs.length > 1 ? ` (also ${r.bcs.slice(1).join(', ')})` : ''}`,
     }))
     .sort((a, b) => qOrder(a.group, b.group));
-  add('open questions', ['## Open questions', ...(qItems.length ? list('Open questions', qItems) : ['None open.'])]);
+  add('open questions', ['## Open questions', ...(qItems.length ? list('Open questions', qItems, byContext) : ['None open.'])]);
 
   // Tier 1: counts per bounded context
   const count = (list2, bc) => list2.filter((r) => isLive(r) && r.bcs.includes(bc)).length;
