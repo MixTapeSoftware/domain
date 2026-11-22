@@ -1,0 +1,7 @@
+{
+  "ticket": "While the card payment is being authorised, keep the products reserved so nobody else can buy the last one.",
+  "branch": "feature/payments-hold-stock",
+  "paths": [],
+  "decisions": ["ADR-4", "ADR-6"],
+  "note": "The branch points at Payments, but the stock hold is a Catalog and Ordering decision (ADR-6). A miss here is the kind of signal the score exists to catch."
+}

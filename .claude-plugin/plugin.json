@@ -1,0 +1,9 @@
+{
+  "name": "domain",
+  "displayName": "Domain",
+  "version": "0.1.0",
+  "description": "Keeps a team's glossary, decision log, open questions and requirements in linked Notion databases, sets them up, and gives each session an index of them.",
+  "author": { "name": "Chad Fennell" },
+  "keywords": ["glossary", "ubiquitous-language", "adr", "decisions", "requirements", "notion", "domain-driven-design"],
+  "network": { "hosts": ["api.notion.com"] }
+}

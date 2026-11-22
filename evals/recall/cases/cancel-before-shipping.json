@@ -1,0 +1,7 @@
+{
+  "ticket": "Add a Cancel button to the order page. It works until the order ships; after that it's hidden.",
+  "branch": "feature/ordering-cancel-button",
+  "paths": ["src/ordering/cancel-order.ts", "src/ordering/order-page.tsx"],
+  "decisions": ["ADR-1", "ADR-5"],
+  "note": "Cancelling must respect that orders can't change once placed (ADR-1) and must refund through Payments (ADR-5)."
+}
