@@ -59,7 +59,7 @@ Write a decision when a word is split or merged, a boundary between bounded cont
 - Read the requirements for the bounded context before building.
 - Add, change or remove a requirement only when a person explicitly asks. Not on your own initiative, even when a conversation, ticket, meeting note, legacy code or test suggests one. If you think a requirement is missing, wrong or out of date, say so and ask.
 - When asked, record it as the person stated it, name them in Provenance, and ask about anything ambiguous rather than filling the gap. A requirement whose source can't be named isn't recorded.
-- State it twice: Plain English that anyone could follow, and a Precise statement that says who, what, when and how much, with "must", numbers and limits, in Agreed glossary terms linked in Glossary terms.
+- State it twice: Plain English that anyone could follow, and a Precise statement that says who, what, when and how much, with "must", numbers and limits, in glossary terms linked in Glossary terms. Proposed terms are fine: a requirement often uses a word before the review agrees it, and the links show which ones are still Proposed. A word with no row gets a Proposed row first.
 - Page body: acceptance criteria first, as a numbered list a test could check; then a Mermaid diagram wherever a picture says it faster; no open questions (those are rows in Open questions, linked in Questions).
 - Status starts and stays at Proposed. Only a person makes a requirement Agreed, Deferred or Dropped. A replacement is a new page; the old one becomes Superseded and names it.
 
@@ -72,6 +72,7 @@ Write a decision when a word is split or merged, a boundary between bounded cont
 ## What agents never do
 
 - Write a local copy of these databases: no GLOSSARY.md, no docs/decisions/.
+- Write a secret (a token, password, key or connection string) or personal data about customers or users (names, contact details, account or order details) to Notion: not in a row, a page, an Answer finding or a Provenance. Say where it lives instead, such as "the limit is set in the payments service's config".
 - Rename an Agreed term in code.
 - Mark a term Agreed, a decision Accepted, or a requirement anything beyond Proposed.
 - Rename a select or multi-select option through the Notion API or MCP. That clears the option from every row that has it. Ask a person to rename it in Notion's property settings, which keeps the values. Renaming a whole property is safe, but property names are what people's views, dashboards and automations depend on, so a rename is a decision, announced to whoever builds on the databases.

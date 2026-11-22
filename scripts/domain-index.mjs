@@ -17,7 +17,9 @@
 // Node 18 or later. Every failure exits 0 so a session always starts.
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import http from 'node:http';
 import https from 'node:https';
 import tls from 'node:tls';
@@ -78,10 +80,41 @@ export function findConfig(startDir) {
   }
 }
 
+// The cache holds only what each session can rebuild from Notion, so it lives in the
+// user's cache directory, outside every project, where nothing can commit or ship it.
+export function userCacheDir() {
+  if (process.env.DOMAIN_CACHE_DIR) return path.resolve(process.env.DOMAIN_CACHE_DIR);
+  const home = os.homedir();
+  let base;
+  if (process.platform === 'darwin') base = path.join(home, 'Library', 'Caches');
+  else if (process.platform === 'win32') base = process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local');
+  else base = process.env.XDG_CACHE_HOME && path.isAbsolute(process.env.XDG_CACHE_HOME) ? process.env.XDG_CACHE_HOME : path.join(home, '.cache');
+  return path.join(base, 'domain-index');
+}
+
+// One folder per project checkout: a readable name plus a hash of its real path.
+export function projectCacheDir(root) {
+  let real = root;
+  try {
+    real = fs.realpathSync(root);
+  } catch {
+    /* keep the path as given */
+  }
+  const name = path.basename(real).replace(/[^A-Za-z0-9_-]/g, '-').slice(0, 40) || 'project';
+  return path.join(userCacheDir(), `${name}-${createHash('sha256').update(real).digest('hex').slice(0, 12)}`);
+}
+
 export function normalizeId(value) {
   if (!value) return null;
   const hex = String(value).replace(/^collection:\/\//, '').replace(/-/g, '').trim().toLowerCase();
   return /^[0-9a-f]{32}$/.test(hex) ? hex : null;
+}
+
+// The committed config chooses which environment variable is sent to Notion as the
+// bearer token, so it may only name a Notion variable: an edited config can't point
+// it at another secret.
+export function validTokenEnv(name) {
+  return typeof name === 'string' && /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) && /notion/i.test(name);
 }
 
 export function loadConfig(file) {
@@ -89,12 +122,13 @@ export function loadConfig(file) {
   const notion = raw.notion || {};
   const dbs = notion.databases || {};
   const dir = path.dirname(file);
+  const root = path.basename(dir) === '.domain' ? path.dirname(dir) : dir;
   const cfg = {
     file,
-    root: path.basename(dir) === '.domain' ? path.dirname(dir) : dir,
-    cacheDir: path.join(dir, 'cache'),
+    root,
+    cacheDir: projectCacheDir(root),
     product: raw.product || 'this product',
-    tokenEnv: raw.tokenEnv || 'NOTION_TOKEN',
+    tokenEnv: raw.tokenEnv ?? 'NOTION_TOKEN',
     apiBase: (process.env.DOMAIN_NOTION_API_BASE || 'https://api.notion.com/v1').replace(/\/+$/, ''),
     links: {
       dashboard: notion.dashboard?.url,
@@ -107,6 +141,10 @@ export function loadConfig(file) {
     boundedContexts: raw.boundedContexts || {},
     problems: [],
   };
+  if (!validTokenEnv(cfg.tokenEnv)) {
+    cfg.problems.push(`tokenEnv must name an environment variable with NOTION in it, such as NOTION_TOKEN (got ${JSON.stringify(cfg.tokenEnv)})`);
+    cfg.tokenEnv = null;
+  }
   for (const db of DATABASES) {
     const id = normalizeId(dbs[db]?.dataSourceId);
     if (!id) cfg.problems.push(`notion.databases.${db}.dataSourceId is missing or not a Notion ID`);
@@ -442,13 +480,13 @@ const slug = (s) => s.toLowerCase().trim().replace(/[\s_]+/g, '-');
 export function contextsFromBranch(boundedContexts, names, branch) {
   if (!branch) return [];
   const b = branch.toLowerCase();
-  const tokens = new Set(b.split(/[/_.-]+/).filter(Boolean));
+  // A name or keyword matches only as whole words between separators, so "ship"
+  // doesn't match a branch about relationships.
+  const asWords = (word) => new RegExp(`(^|[/_.-])${slug(word).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[/_.-])`).test(b);
   const found = [];
   for (const name of new Set([...names, ...Object.keys(boundedContexts)])) {
-    const s = slug(name);
-    const bounded = new RegExp(`(^|[/_.-])${s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[/_.-])`);
-    const keywords = (boundedContexts[name]?.branch || []).map((k) => k.toLowerCase());
-    if (bounded.test(b) || keywords.some((k) => tokens.has(k) || b.includes(k))) found.push(name);
+    const keywords = boundedContexts[name]?.branch || [];
+    if (asWords(name) || keywords.some(asWords)) found.push(name);
   }
   return found;
 }
@@ -741,9 +779,7 @@ function cacheFile(cfg, session) {
 }
 
 function writeCache(cfg, session, data) {
-  fs.mkdirSync(cfg.cacheDir, { recursive: true });
-  const ignore = path.join(cfg.cacheDir, '.gitignore');
-  if (!fs.existsSync(ignore)) fs.writeFileSync(ignore, '# Per-session caches for the domain index. Regenerated each session; never commit them.\n*\n');
+  fs.mkdirSync(cfg.cacheDir, { recursive: true, mode: 0o700 });
   const file = cacheFile(cfg, session);
   fs.writeFileSync(`${file}.tmp`, JSON.stringify(data));
   fs.renameSync(`${file}.tmp`, file);
@@ -789,18 +825,23 @@ export async function runFull({ cfg, token, cwd, session }) {
   const state = { cfg, schemas, rows, ctx, warnings, now: checkedAt };
   const result = buildFull(state);
   if (session) {
-    writeCache(cfg, session, {
-      version: 1,
-      lastCheck: checkedAt.toISOString(),
-      level: result.level,
-      ctx,
-      warnings,
-      schemas,
-      rows: Object.fromEntries(DATABASES.map((db) => [db, byId(rows[db])])),
-      lines: lineMap(result.entries),
-      unavailableNotified: false,
-    });
-    pruneCache(cfg);
+    try {
+      writeCache(cfg, session, {
+        version: 1,
+        lastCheck: checkedAt.toISOString(),
+        level: result.level,
+        ctx,
+        warnings,
+        schemas,
+        rows: Object.fromEntries(DATABASES.map((db) => [db, byId(rows[db])])),
+        lines: lineMap(result.entries),
+        unavailableNotified: false,
+      });
+      pruneCache(cfg);
+    } catch (err) {
+      // The index is already built: keep it, and say why changes won't follow.
+      result.text += `\n\nNote: the session cache couldn't be saved in ${cfg.cacheDir} (${err.code || err.message}), so changes in Notion won't be reported before each prompt this session.`;
+    }
   }
   return { ...result, state, notion };
 }
@@ -910,8 +951,9 @@ export async function runDoctor({ cwd, args }) {
     return out.join('\n');
   }
   for (const p of cfg.problems) bad(p);
-  const token = process.env[cfg.tokenEnv];
-  if (token) ok(`$${cfg.tokenEnv} is set (${token.length} characters)`);
+  const token = cfg.tokenEnv ? process.env[cfg.tokenEnv] : null;
+  if (!cfg.tokenEnv) note("Fix tokenEnv first; the token isn't read until it names a Notion variable.");
+  else if (token) ok(`$${cfg.tokenEnv} is set (${token.length} characters)`);
   else {
     bad(`$${cfg.tokenEnv} isn't set, so the hooks print nothing`);
     note('1. In Notion, open Settings → Connections → Develop or manage integrations, and create an internal integration.');
@@ -1055,6 +1097,10 @@ async function main() {
     cfg = loadConfig(file);
   } catch (err) {
     await write(unavailableLine(`${file} can't be read (${err.message})`));
+    return;
+  }
+  if (!cfg.tokenEnv) {
+    await write(unavailableLine(`${file} is incomplete (${cfg.problems[0]})`));
     return;
   }
   const token = process.env[cfg.tokenEnv];

@@ -68,7 +68,7 @@ One page per functional requirement: something the product must do for the peopl
 | Requirement | Title | A short name for what the product must do |
 | REQ | Unique ID | |
 | Plain English | Text | What it means, as simply as possible and with no jargon, so anyone could follow it |
-| Precise statement | Text | The requirement in precise technical English: exact, testable, in Agreed glossary terms |
+| Precise statement | Text | The requirement in precise technical English: exact, testable, in glossary terms (Agreed or Proposed) |
 | Source | Select: Interview, Meeting, Product, Customer, Legacy system, Regulation, Engineering, Backlog | What kind of source it came from. Leave out Legacy system if there isn't one |
 | Provenance | Text | Who asked for it or where it came from, when, and a link if there is one |
 | Bounded context | Multi-select, as on Decisions | |
@@ -151,7 +151,7 @@ CREATE TABLE (
   "Requirement" TITLE COMMENT 'A short name for what the product must do',
   "REQ" UNIQUE_ID PREFIX 'REQ',
   "Plain English" RICH_TEXT COMMENT 'What it means, as simply as possible and with no jargon, so anyone could follow it',
-  "Precise statement" RICH_TEXT COMMENT 'The requirement in precise technical English: exact, testable, in Agreed glossary terms',
+  "Precise statement" RICH_TEXT COMMENT 'The requirement in precise technical English: exact, testable, in glossary terms (Agreed or Proposed)',
   "Source" SELECT('Interview':blue, 'Meeting':green, 'Product':purple, 'Customer':orange, {SOURCE_LEGACY}'Regulation':red, 'Engineering':pink, 'Backlog':gray) COMMENT 'What kind of source it came from',
   "Provenance" RICH_TEXT COMMENT 'Who asked for it or where it came from, when, and a link if there is one',
   "Bounded context" MULTI_SELECT({BC}, 'Spans contexts':gray) COMMENT 'Which bounded contexts it touches',

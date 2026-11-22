@@ -10,10 +10,15 @@ import { spawn, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createMock, MOCK_TOKEN } from './mock-notion.mjs';
 import { DATA_SOURCE_IDS, SCHEMAS } from './fixtures/online-orders.mjs';
-import { globToRegExp, contextsFromBranch, contextsFromPaths, NOTION_VERSION } from '../scripts/domain-index.mjs';
+import { globToRegExp, contextsFromBranch, contextsFromPaths, projectCacheDir, userCacheDir, NOTION_VERSION } from '../scripts/domain-index.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SCRIPT = path.join(repoRoot, 'scripts', 'domain-index.mjs');
+
+// Keep the tests' session caches out of the real user cache directory. Child
+// processes inherit this, so they compute the same per-project folders.
+process.env.DOMAIN_CACHE_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'domain-cache-'));
+const cacheFileFor = (dir, session) => path.join(projectCacheDir(dir), `${session}.json`);
 
 let mock;
 let base;
@@ -24,7 +29,7 @@ before(async () => {
 });
 after(() => mock.close());
 
-function makeProject({ branch = 'feature/ordering-cancel', files = ['src/ordering/cancel.ts'], index = {} } = {}) {
+function makeProject({ branch = 'feature/ordering-cancel', files = ['src/ordering/cancel.ts'], index = {}, extra = {} } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'domain-index-'));
   const git = (...args) => execFileSync('git', args, { cwd: dir, stdio: 'ignore' });
   git('init', '-q', '-b', 'main');
@@ -48,14 +53,15 @@ function makeProject({ branch = 'feature/ordering-cancel', files = ['src/orderin
         Payments: { paths: ['src/payments/**'] },
         Shipping: { paths: ['src/shipping/**'], branch: ['parcel'] },
       },
+      ...extra,
     }),
   );
   return dir;
 }
 
 // Async on purpose: the mock server runs in this process and must keep answering.
-function run(cwd, args, { token = MOCK_TOKEN, apiBase = base, stdin } = {}) {
-  const env = { ...process.env, DOMAIN_NOTION_API_BASE: apiBase, NOTION_TOKEN: token ?? '' };
+function run(cwd, args, { token = MOCK_TOKEN, apiBase = base, stdin, env: extraEnv = {} } = {}) {
+  const env = { ...process.env, DOMAIN_NOTION_API_BASE: apiBase, NOTION_TOKEN: token ?? '', ...extraEnv };
   if (token === null) delete env.NOTION_TOKEN;
   const started = Date.now();
   return new Promise((resolve) => {
@@ -138,8 +144,8 @@ test('delta prints only what changed, and nothing on a second run', async () => 
   const session = 'session-delta';
   const hook = JSON.stringify({ session_id: session, cwd: dir, hook_event_name: 'SessionStart', source: 'startup' });
   assert.equal((await run(dir, ['full'], { stdin: hook })).status, 0);
-  assert.ok(fs.existsSync(path.join(dir, '.domain', 'cache', `${session}.json`)));
-  assert.equal(fs.readFileSync(path.join(dir, '.domain', 'cache', '.gitignore'), 'utf8').trim().split('\n').pop(), '*');
+  assert.ok(fs.existsSync(cacheFileFor(dir, session)), 'the session cache is in the user cache directory');
+  assert.ok(!fs.existsSync(path.join(dir, '.domain', 'cache')), 'nothing is cached inside the project');
 
   // Within the interval, delta doesn't ask Notion at all.
   const quiet = await run(dir, ['delta', '--stats'], { stdin: JSON.stringify({ session_id: session, cwd: dir }) });
@@ -167,7 +173,7 @@ test('after a failed delta, the next prompt within the interval asks Notion noth
     const session = 'session-outage';
     assert.equal((await run(dir, ['full', '--session', session], { apiBase: flakyBase })).status, 0);
     // Make the last check old enough for delta to ask again, then slow Notion past the timeout.
-    const file = path.join(dir, '.domain', 'cache', `${session}.json`);
+    const file = cacheFileFor(dir, session);
     const cache = JSON.parse(fs.readFileSync(file, 'utf8'));
     cache.lastCheck = new Date(Date.now() - 3600000).toISOString();
     fs.writeFileSync(file, JSON.stringify(cache));
@@ -307,4 +313,62 @@ test('hook configurations point at the script for both tools', async () => {
   assert.ok(codex.hooks.SessionStart[0].hooks[0].additionalContextLimit >= 9500 / 3.5);
   const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, '.codex-plugin', 'plugin.json'), 'utf8'));
   assert.equal(manifest.hooks, './hooks/codex-hooks.json');
+});
+
+test('tokenEnv may only name a Notion variable, and another variable is never read', async () => {
+  const requests = async () => (await (await fetch(base.replace(/\/v1$/, '/__log'))).json()).length;
+  const dir = makeProject({ extra: { tokenEnv: 'AWS_SECRET_ACCESS_KEY' } });
+  const before = await requests();
+  const r = await run(dir, ['full'], { token: null, env: { AWS_SECRET_ACCESS_KEY: MOCK_TOKEN } });
+  assert.equal(r.status, 0);
+  assert.match(r.stdout, /^Domain index unavailable: .* is incomplete \(tokenEnv must name an environment variable with NOTION in it/);
+  assert.equal(await requests(), before, 'nothing was sent to Notion');
+  const doctor = await run(dir, ['--doctor'], { token: null });
+  assert.match(doctor.stdout, /problem {2}tokenEnv must name an environment variable with NOTION in it/);
+
+  const ok = makeProject({ extra: { tokenEnv: 'MY_NOTION_KEY' } });
+  const good = await run(ok, ['full'], { token: null, env: { MY_NOTION_KEY: MOCK_TOKEN } });
+  assert.match(good.stdout, /^# Domain index: Online Orders/);
+});
+
+test("if the session cache can't be saved, the index is still printed and says why", async () => {
+  const dir = makeProject();
+  const blocker = path.join(os.tmpdir(), `domain-cache-blocker-${process.pid}`);
+  fs.writeFileSync(blocker, 'not a directory');
+  const r = await run(dir, ['full', '--session', 'no-cache'], { env: { DOMAIN_CACHE_DIR: blocker } });
+  assert.equal(r.status, 0);
+  assert.match(r.stdout, /^# Domain index: Online Orders/);
+  assert.match(r.stdout, /Note: the session cache couldn't be saved in .* \((ENOTDIR|EEXIST)\), so changes in Notion won't be reported/);
+});
+
+test('branch keywords and names match whole words only', () => {
+  const bcs = { Shipping: { branch: ['ship'] }, Payments: {} };
+  const names = Object.keys(bcs);
+  assert.deepEqual(contextsFromBranch(bcs, names, 'feature/relationship-mapping'), []);
+  assert.deepEqual(contextsFromBranch(bcs, names, 'fix/ship-dates'), ['Shipping']);
+  assert.deepEqual(contextsFromBranch(bcs, names, 'feature/repayments'), []);
+  assert.deepEqual(contextsFromBranch(bcs, names, 'feature/payments_refunds'), ['Payments']);
+});
+
+test('the cache lives in the user cache directory, one folder per project', () => {
+  const saved = { DOMAIN_CACHE_DIR: process.env.DOMAIN_CACHE_DIR, XDG_CACHE_HOME: process.env.XDG_CACHE_HOME };
+  try {
+    delete process.env.DOMAIN_CACHE_DIR;
+    if (process.platform === 'linux') {
+      process.env.XDG_CACHE_HOME = '/var/tmp/xdg-test';
+      assert.equal(userCacheDir(), '/var/tmp/xdg-test/domain-index');
+      process.env.XDG_CACHE_HOME = 'relative/path';
+      assert.equal(userCacheDir(), path.join(os.homedir(), '.cache', 'domain-index'), 'a relative XDG_CACHE_HOME is ignored');
+    }
+    if (process.platform === 'darwin') assert.equal(userCacheDir(), path.join(os.homedir(), 'Library', 'Caches', 'domain-index'));
+    const a = projectCacheDir('/srv/one/shop');
+    const b = projectCacheDir('/srv/two/shop');
+    assert.notEqual(a, b, 'two checkouts with the same folder name get different caches');
+    assert.match(path.basename(a), /^shop-[0-9a-f]{12}$/);
+  } finally {
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  }
 });

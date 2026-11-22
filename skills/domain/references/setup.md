@@ -125,7 +125,7 @@ Fetch each of the four data sources and check them against `schemas.md`: every p
 
 ## 9. Write the project config
 
-If you're working in the project's repository, write `.domain/config.json` (and nothing else in the repository). It holds no secrets and is meant to be committed; the index script's cache goes in `.domain/cache/`, which ignores itself. If the file exists, update its Notion values and keep the person's paths, budget and interval.
+If you're working in the project's repository, write `.domain/config.json` (and nothing else in the repository). It holds no secrets and is meant to be committed. The index script keeps its cache outside the repository, in the user's cache directory. `tokenEnv` must name a variable with NOTION in it; the script refuses any other. If the file exists, update its Notion values and keep the person's paths, budget and interval.
 
 ```json
 {

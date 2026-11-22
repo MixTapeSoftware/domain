@@ -94,7 +94,13 @@ node scripts/domain-index.mjs delta                   # what changed since this 
 node scripts/domain-index.mjs --doctor                # explains the setup and what's missing
 ```
 
-**Delta.** `delta` asks Notion at most once per interval (5 minutes by default), and only for rows edited since its last check. Within the interval it makes no request at all. It prints the lines that changed, or nothing. Per-session state lives in `.domain/cache/<session id>.json`, which ignores itself in git. It's only a cache: everything in it comes from Notion and is rebuilt every session.
+**Delta.** `delta` asks Notion at most once per interval (5 minutes by default), and only for rows edited since its last check. Within the interval it makes no request at all. It prints the lines that changed, or nothing. Per-session state lives outside every repository, in the user's cache directory:
+
+- Linux: `$XDG_CACHE_HOME`, or `~/.cache` if that isn't set;
+- macOS: `~/Library/Caches`;
+- Windows: `%LOCALAPPDATA%`.
+
+Files go under `domain-index/<project>-<hash>/<session id>.json`, and `DOMAIN_CACHE_DIR` overrides the location. It's only a cache: everything in it comes from Notion and is rebuilt every session. Files older than 14 days are deleted. If the cache can't be written, the index still prints and ends with a note saying changes won't be reported before each prompt that session.
 
 **Budget.** About 3,000 tokens by default, and never more than 9,500 characters, because Claude Code passes at most 10,000 characters of hook output to the model and saves anything longer to a file. When the index is over budget it shortens glossary definitions first, then replaces the tier-2 titles with counts and the `context` command. It says so in the index itself, and `--stats` reports the sizes. Token counts are estimated as characters ÷ 3.5.
 
@@ -143,7 +149,9 @@ export NOTION_TOKEN=…
 }
 ```
 
-`branch` is optional: extra words that mark a branch as belonging to that bounded context.
+`tokenEnv` names the environment variable that holds the token. It must contain NOTION: the config is committed, so the script refuses any other name rather than send some other secret to Notion.
+
+`branch` is optional: extra words that mark a branch as belonging to that bounded context. Names and keywords match only as whole words between `/`, `-`, `_` or `.`, so `ship` matches `fix/ship-dates` but not `feature/relationships`.
 
 ### Claude Code and Codex
 
@@ -182,7 +190,7 @@ DOMAIN_NOTION_API_BASE=http://127.0.0.1:8787/v1 NOTION_TOKEN=mock-token \
 claude plugin validate .
 ```
 
-`DOMAIN_NOTION_API_BASE` exists for the mock and tests. `DOMAIN_CONFIG` points the script at a config outside the usual `.domain/config.json`.
+`DOMAIN_NOTION_API_BASE` exists for the mock and tests. `DOMAIN_CONFIG` points the script at a config outside the usual `.domain/config.json`. `DOMAIN_CACHE_DIR` moves the session cache; the tests point it at a temporary directory.
 
 ### Known limits
 

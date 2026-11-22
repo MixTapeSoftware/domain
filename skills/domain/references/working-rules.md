@@ -40,11 +40,15 @@ How the {PRODUCT} team keeps its shared language, decisions, open questions and 
 
 - A requirement says what is needed, not how it's built. How it's built is a decision.
 - Only on request. A requirement is added, changed or removed only when a person explicitly asks. Agents never do this on their own initiative, even when a conversation, ticket, meeting note, legacy code or test suggests one. An agent that thinks a requirement is missing, wrong or out of date says so and asks. When asked, it records the requirement as the person stated it, names them in Provenance, and asks about anything ambiguous rather than filling the gap.
-- Every requirement is stated twice: in Plain English, and as a Precise statement that says who, what, when and how much, with "must", numbers and limits, in Agreed glossary terms, linked in Glossary terms.
+- Every requirement is stated twice: in Plain English, and as a Precise statement that says who, what, when and how much, with "must", numbers and limits, in glossary terms, linked in Glossary terms. Proposed terms are fine: a requirement often uses a word before the review agrees it, and the links show which ones are still Proposed.
 - A requirement whose source can't be named isn't recorded.
 - Page body: acceptance criteria first, as a numbered list a test could check; then a Mermaid diagram wherever a picture says it faster (a flow, a state machine, a sequence); no open questions: those are rows in Open questions, linked in Questions.
 - Only a person makes a requirement Agreed, Deferred or Dropped. A replacement is a new page, and the old one becomes Superseded and names it. An Agreed requirement's meaning never changes quietly.
 - Built works as on Decisions. A {TRACKER} ticket links the requirement and states what it changes ("makes REQ-12 true for X"). It doesn't copy the requirement's text.
+
+## What never goes in
+
+- No secrets (tokens, passwords, keys, connection strings) and no personal data about customers or users (names, contact details, account or order details), from people or agents, anywhere in these pages. Say where such things live instead.
 
 ## Changing the databases themselves
 
