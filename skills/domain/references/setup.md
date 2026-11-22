@@ -61,7 +61,11 @@ The Context map and the data model pages link to each other, so create in this o
 
 ## 7. Fill in the dashboard
 
-Replace the dashboard's content with the layout below. Keep the exact `<database>` and `<page>` tags that a fetch of the dashboard returns for its children, so they move into their sections instead of being deleted. Then add the inline overview with the create-view tool (`parent_page_id` set to the dashboard, which appends at the end): a Decisions table named "Recent decisions" (`SORT BY "Created" DESC; SHOW "Decision", "ADR", "Status", "Built", "Bounded context"`) and a Glossary table named "Recent glossary changes" (`SORT BY "Changed on" DESC; SHOW "Term", "Status", "Bounded context", "Changed on"`).
+If you created the dashboard in step 3, replace its content with the layout below. Keep the exact `<database>` and `<page>` tags that a fetch of the dashboard returns for its children, so they move into their sections instead of being deleted.
+
+If the dashboard already existed, never replace its content: people may have added their own text, links and views to it, and a replacement deletes them. Fetch it, then add only the sections for what this run created, each with its heading, line and exact tag from the layout below, where the layout puts it. Edit only those parts and leave every other block as it is. If a new child's tag can't be moved into its section without replacing the page, leave it where Notion put it and tell the person in step 10.
+
+In both cases, then add the inline overview with the create-view tool (`parent_page_id` set to the dashboard, which appends at the end): a Decisions table named "Recent decisions" (`SORT BY "Created" DESC; SHOW "Decision", "ADR", "Status", "Built", "Bounded context"`) and a Glossary table named "Recent glossary changes" (`SORT BY "Changed on" DESC; SHOW "Term", "Status", "Bounded context", "Changed on"`).
 
 On a second run, don't add these views again if the dashboard already shows them: a fetch lists them under "Recent changes" as inline `<database … inline="true">` tags whose `data-source-url` is the Decisions or Glossary data source.
 
@@ -154,6 +158,6 @@ Print, in this order:
 
 1. The agent instructions snippet from `agents-snippet.md`, with every placeholder replaced by the real URLs and data source IDs. Check that no `{` is left. Tell the person to paste it into the project's AGENTS.md or CLAUDE.md.
 2. What setup created and what it found already there, as two short lists.
-3. Anything they have to do by hand, from step 4 or 8.
+3. Anything they have to do by hand, from steps 4, 7 and 8.
 4. "Notion opened each new diagram in split view: switch each to Preview from the block's menu." Name the pages that have diagrams.
 5. For the session index hooks: create a read-only Notion integration (only the "Read content" capability), add it to the dashboard page under ••• → Connections, and put its secret in `NOTION_TOKEN` in their shell profile, never in a file the repository tracks. `node <plugin>/scripts/domain-index.mjs --doctor` checks the result. In Codex, they also review and trust the plugin's hooks in `/hooks`.
