@@ -116,9 +116,12 @@ test('with no bounded context worked out, every title is listed when it fits', a
 });
 
 test('over budget: definitions are shortened first, then titles become counts, and the output says so', async () => {
-  const dir = makeProject({ index: { budgetTokens: 1150 } });
+  // The index prints the script's absolute path once, so the budget allows for it:
+  // otherwise a deeper checkout needs a different budget to reach the same level.
+  const budget = 1200 + Math.ceil(SCRIPT.length / 3.5);
+  const dir = makeProject({ index: { budgetTokens: budget } });
   const r = await run(dir, ['full', '--stats']);
-  assert.match(r.stdout, /Shortened to fit the index budget \(1150 tokens/);
+  assert.match(r.stdout, new RegExp(`Shortened to fit the index budget \\(${budget} tokens`));
   assert.match(r.stdout, /glossary definitions cut to/);
   assert.match(r.stderr, /shortened: yes/);
 
