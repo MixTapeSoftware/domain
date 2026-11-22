@@ -827,7 +827,10 @@ export async function runDelta({ cfg, token, session, force }) {
   const cache = readCache(cfg, session);
   if (!cache) return { text: '' };
   const intervalMs = cfg.index.deltaIntervalMinutes * 60000;
-  if (!force && Date.now() - Date.parse(cache.lastCheck) < intervalMs) return { text: '' };
+  // A failed check counts toward the interval too, so an outage costs one request
+  // per interval rather than one on every prompt.
+  const lastAsked = Math.max(Date.parse(cache.lastCheck), cache.lastAttempt ? Date.parse(cache.lastAttempt) : 0);
+  if (!force && Date.now() - lastAsked < intervalMs) return { text: '' };
   const checkedAt = new Date();
   // Notion rounds last_edited_time to the minute, so look a minute further back.
   const since = new Date(Date.parse(cache.lastCheck) - 60000).toISOString();
@@ -839,11 +842,14 @@ export async function runDelta({ cfg, token, session, force }) {
     if (!(err instanceof Unavailable)) throw err;
     const first = !cache.unavailableNotified;
     cache.unavailableNotified = true;
+    // lastCheck stays put: it anchors the next query, so no edit is skipped once Notion answers.
+    cache.lastAttempt = checkedAt.toISOString();
     writeCache(cfg, session, cache);
     return { text: first ? unavailableLine(err.message) : '', notion };
   }
   for (const [db, list] of changed) for (const r of list) cache.rows[db][r.id] = r;
   cache.lastCheck = checkedAt.toISOString();
+  delete cache.lastAttempt;
   cache.unavailableNotified = false;
   const state = {
     cfg,

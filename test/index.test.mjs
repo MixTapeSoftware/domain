@@ -156,6 +156,31 @@ test('delta prints only what changed, and nothing on a second run', async () => 
   assert.equal(again.stdout, '');
 });
 
+test('after a failed delta, the next prompt within the interval asks Notion nothing', async () => {
+  const flaky = createMock();
+  const flakyBase = await flaky.listen();
+  try {
+    const dir = makeProject({ index: { timeoutMs: 500 } });
+    const session = 'session-outage';
+    assert.equal((await run(dir, ['full', '--session', session], { apiBase: flakyBase })).status, 0);
+    // Make the last check old enough for delta to ask again, then slow Notion past the timeout.
+    const file = path.join(dir, '.domain', 'cache', `${session}.json`);
+    const cache = JSON.parse(fs.readFileSync(file, 'utf8'));
+    cache.lastCheck = new Date(Date.now() - 3600000).toISOString();
+    fs.writeFileSync(file, JSON.stringify(cache));
+    flaky.state.delayMs = 2000;
+
+    const failed = await run(dir, ['delta', '--session', session], { apiBase: flakyBase });
+    assert.match(failed.stdout, /^Domain index unavailable: /);
+    const next = await run(dir, ['delta', '--session', session, '--stats'], { apiBase: flakyBase });
+    assert.equal(next.stdout, '');
+    assert.match(next.stderr, /Notion: no requests/);
+    assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).lastCheck, cache.lastCheck);
+  } finally {
+    await flaky.close();
+  }
+});
+
 test('context mode loads another bounded context, with decisions that span contexts', async () => {
   const dir = makeProject();
   const out = (await run(dir, ['context', 'shipping'])).stdout;
