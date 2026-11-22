@@ -299,7 +299,7 @@ function propertyValue(prop) {
     case 'unique_id': {
       const u = prop.unique_id;
       if (!u || u.number == null) return null;
-      return u.prefix ? `${u.prefix}-${u.number}` : String(u.number);
+      return u.prefix ? `${oneLine(u.prefix)}-${u.number}` : String(u.number);
     }
     default:
       return null;
